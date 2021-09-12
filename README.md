@@ -84,7 +84,7 @@ Sotto <_server_> e' presente il progetto Python Flask che implementa i seguenti 
     r = requests.put('https://your_url_here/v0/measures?device=A001', { 'values': 'P25:1929.3:1502.2:2123.2|P10:992:901:1023', 'token': 'XXXXXX' })
     ```
 
-### Data fetch (latest)
+### Data fetch (last)
 
   Endpoint utilizzato dal web client per ottenere l'ultimo valore di tutti i sensori inviato dai vari dispositivi
 
