@@ -52,23 +52,20 @@ Sotto <_server_> e' presente il progetto Python Flask che implementa i seguenti 
 ### Data upload
 
   Endpoint utilizzato dal device per inviare i dati rilevati dai propri sensori.
-  La strategia di questo endpoint consiste nell'inserire direttamente in url l'identificativo del dispositivo, in modo che anche direttamente dai log delle chiamate sia possibile distinguere i vari dispositivi, mentre come parametro PUT va inserita la stringa con tutti i valori dei sensori. Il formato di questa stringa non e' ancora definitivo.
+  La strategia di questo endpoint consiste nell'inserire direttamente in url l'identificativo del dispositivo, in modo che anche direttamente dai log delle chiamate sia possibile distinguere i vari dispositivi, mentre come parametro PUT va inserita la stringa con tutti i valori dei sensori. La stringa e' composta da tante coppie chiave:valoreAVG:valoreMIN:valoreMAX separate dal simbolo |, dove le chiavi sono le sigle dei relativi parametri (es. P25, P10), ed i tre valori indicano rispettivamente il valore medio, il minimo ed il massimo. 
+  Il parametro "token" e' un codice segreto fornito in fase di registrazione del dispositivo.
 
   * **URL:** 
-    /v0/data
+    /v0/measures/{device_id}
   * **Method:**
 
-    `PUT`
+    `POST`
 
-  * **URL Params:** 
-
-    **Required**
-    `device=[alphanumeric]`
-
-  * **Data Params (URL encoded)**
+  * **Data Params (URL encoded):**
 
     **Required**
     `values=[alphanumeric]`
+    `token=[alphanumeric]`
 
   * **Success Response:**
 
@@ -78,21 +75,21 @@ Sotto <_server_> e' presente il progetto Python Flask che implementa i seguenti 
   * **Error Response:**
 
     * **Code:** 400 <br />
-      **Content:** `{ status: 'fail', reason: 'Invalid values' }`    
+      **Content:** `{ status: 'fail', reason: 'Invalid values' / 'Unauth' }`
     
   * **Sample Call:**
 
     ```
     import requests
-    r = requests.put('https://your_url_here/v0/data?device=A001', { 'values': 'P25:1929.3P10:992' })
+    r = requests.put('https://your_url_here/v0/measures?device=A001', { 'values': 'P25:1929.3:1502.2:2123.2|P10:992:901:1023', 'token': 'XXXXXX' })
     ```
 
 ### Data fetch (latest)
 
-  Endpoint utilizzato dal web client per ottenere l'ultimo valore inviato dai vari dispositivi
+  Endpoint utilizzato dal web client per ottenere l'ultimo valore di tutti i sensori inviato dai vari dispositivi
 
   * **URL:** 
-    /v0/data/last
+    /v0/measures/last
   * **Method:**
 
     `GET`
@@ -128,23 +125,152 @@ Sotto <_server_> e' presente il progetto Python Flask che implementa i seguenti 
 
     Tutto l'oggetto "meta" puo' essere vuoto, se il dispositivo non e' ancora stato geolocalizzato
 
+  * **Sample Call:**
+
+    ```
+    import requests
+    r = requests.get('https://your_url_here/v0/measures/last', {})
+    ```
+    
+### Data fetch (history)
+
+  Endpoint utilizzato dal web client per ottenere lo storico dei valori di uno o piu' sensori/dispositivi.
+  Il parametro "devices" permette di specificare l'elenco di dispositivi a cui siamo interessati, espressi come device ID separati dal simbolo |. Se assente, il sistema mostrera' tutti i device.
+  Il parametro "sensors" permette di specificare l'elenco di sensori a cui siamo interessati, espressi come measure ID separati dal simbolo |. Se assente, il sistema mostrera' tutti i sensori.
+  Il parametri "amount" indica il numero di valori da scaricare. Se omesso, e' pari a 1000. Questo valore e' cumulativo su tutti i dispositivi e su tutti i sensori
+  I campi "from" e "to" permettono di indicare una finestra temporale in cui scaricare i dati. Se omesso, "to" e' pari a NOW() e  "from" viene ignorato, semplicemente vengono riportati abbastanza valori da esaurire il db oppure da raggiungere il limite indicato da "amount".
+  Tutti i valori sono ordinati per data, in ordine decrescente
+  
+
+  * **URL:** 
+    /v0/measures/all
+  * **Method:**
+
+    `GET`
+    
+  * **URL Params:**
+
+    **Optional**
+    `devices=[alphanumeric]`
+    `sensors=[alphanumeric]`
+    `amount=[decimal]`
+    `from=[timestamp]`
+    `to=[timestamp]`
+
+  * **Success Response:**
+
+    * **Code:** 200 <br />
+      **Content:** 
+   
+    ``` 
+    {
+	status: "ok",
+	amount: 123,
+	values: [
+	  { device_id: "A001",  sensor_id: "PM25", date: 1631457975, value: 2933, value_min: 2500, value_max: 2400 },
+	  { device_id: "A001",  sensor_id: "PM10", date: 1631457975, value: 1023, value_min: 1000, value_max: 1100 },
+	  { device_id: "A002",  sensor_id: "PM25", date: 1631457970, value: 2500, value_min: 2400, value_max: 2600 },
+	  ...
+	]
+    }
+    ```
+
+  * **Sample Call:**
+
+    ```
+    import requests
+    r = requests.get('https://your_url_here/v0/measures/all', { amount: 100 })
+    ```
+
+### Registrazione device
+
+  Endpoint utilizzato dal client web per registrare un nuovo dispositivo. Questo endpoint e' protetto dall'api di login, che va richiamata prima di poter fare accesso a questa chiamata
+  
+  * **URL:**
+    /v0/devices
+  * **Method:**
+    
+    `PUT`
+    
+  * **Data Params (URL encoded):**
+   
+    `lat=[numeric]`
+    `lon=[numeric]`
+    `nome=[alphanumeric]`
+    
+    **Optional**
+    
+    `desc=[alphanumeric]`
+    
+  * **Success Response:**
+
+     * **Code:** 200 <br />
+       **Content:** `{ status: 'ok', id: 1234, token: 'XXXXX' }`
+
+  * **Error Response:
+
+    * **Code:** 400 <br />
+      **Content:** `{ status: 'fail', reason: 'Unauth' }`
+      
+  * **Sample Call:**
+
+    ```
+    import requests
+    r = requests.put('https://your_url_here/v0/devices', { lat:12.2324254, lon:45.2345435, name: 'Test Device', desc': 'This is a test device with random coords' })
+    ```
+      
+### Elenco device
+  
+  Endpoint utilizzabile per ottenere l'elenco completo di tutti i dispositivi registrati
+  
+  * **URL:**
+    /v0/devices
+  * **Method:**
+    
+    `GET`
+        
+  * **Success Response:**
+
+    * **Code:** 200 <br />
+      **Content:** 
+   
+    ``` 
+    {
+	"status": "ok",
+	"devices": [
+	{
+		"id": "A001",
+		"meta": {
+			"nome": "I.I.S. G.Cena",
+			"desc": "Descrizione <b>generica</b>",
+			"lat": 45.467,
+			"lon": 7.876
+		}
+	},
+	...
+	]
+    }
+    ```
+    
+  * **Sample Call:**
+
+    ```
+    import requests
+    r = requests.get('https://your_url_here/v0/devices', {})
+    ```
+      
 ### Aggiornamento metadati
 
   Endpoint utilizzato dal client web per associate metadati ad un dispositivo.
-  Tutti i parametri sono opzionali, in modo che questa API possa essere richiamata per aggiornare anche solo un valore.
+  Tutti i parametri sono opzionali, in modo che questa API possa essere richiamata per aggiornare anche solo un valore. Anche questa API e' protetta dal login
 
   * **URL:** 
-    /v0/device
+    /v0/devices/{device_id}
   * **Method:**
 
-    `POST`
+    `PUT`
 
-  * **URL Params:** 
-
-    **Required**
-    `id=[alphanumeric]`
-
-  * **Data Params (URL encoded)**
+  * **Data Params (URL encoded):**
 
     **Optional**
     `nome=[alphanumeric]`
@@ -160,14 +286,133 @@ Sotto <_server_> e' presente il progetto Python Flask che implementa i seguenti 
   * **Error Response:**
 
     * **Code:** 400 <br />
-      **Content:** `{ status: 'fail', reason: 'Invalid values' }`    
+      **Content:** `{ status: 'fail', reason: 'Invalid values'/'Unauth' }`
     
   * **Sample Call:**
 
     ```
     import requests
-    r = requests.post('https://your_url_here/v0/device?id=A001', { nome='I.I.S. G.Cena', desc='nuova descrizione' })
+    r = requests.put('https://your_url_here/v0/device/A001', { nome='I.I.S. G.Cena', desc='nuova descrizione' })
     ```
+
+### Rimozione dispositivo
+
+  Endoint utilizzabile dal client web per eliminare un dispositivo.
+  
+  * **URL:** 
+    /v0/devices/{device_id}
+  * **Method:**
+
+    `DELETE`
+
+
+  * **Success Response:**
+
+    * **Code:** 200 <br />
+      **Content:** `{ status: 'ok' }`
+
+  * **Error Response:**
+
+    * **Code:** 400 <br />
+      **Content:** `{ status: 'fail', reason: 'Unauth' }`
+    
+  * **Sample Call:**
+
+    ```
+    import requests
+    r = requests.delete('https://your_url_here/v0/device/A001', { })
+    
+### Elenco parametri
+
+  Endoint utilizzabile dal client web per ottenere l'elenco dei parametri registrati ed i relativi codici
+  
+  * **URL:** 
+    /v0/parameters
+  * **Method:**
+
+    `GET`
+
+
+  * **Success Response:**
+
+    * **Code:** 200 <br />
+      **Content:** 
+   
+    ``` 
+    {
+	"status": "ok",
+	"parameters": [
+	    { id: "P10", desc: 'Valore del PM-10' },
+	    { id: "P25", desc: 'Valore del PM-2.5' },
+	    ...
+	]
+    }
+    ```
+    
+  * **Sample Call:**
+
+    ```
+    import requests
+    r = requests.get('https://your_url_here/v0/parameters', { })
+
+### Registrazione parametri
+
+  Endoint utilizzabile dal client web per aggiungere un nuovo parametro/sensore al sistema
+  
+  * **URL:** 
+    /v0/parameters
+  * **Method:**
+
+    `POST`
+
+  * **Data Params (URL encoded):**
+
+    `id=[alphanumeric]`
+    `desc=[alphanumeric]`
+    
+  * **Success Response:**
+
+    * **Code:** 200 <br />
+      **Content:** 
+   
+    ``` 
+    {
+	status: "ok",
+	id: "XXX"
+    }
+    ```
+    
+  * **Sample Call:**
+
+    ```
+    import requests
+    r = requests.put('https://your_url_here/v0/parameters', { id: 'PM25', desc: 'Valore PM 2.5' })
+
+### Eliminazione parametro
+
+  Endoint utilizzabile dal client web per eliminare un  parametro/sensore dal sistema
+  
+  * **URL:** 
+    /v0/parameters/{parameter_ID}
+  * **Method:**
+
+    `DELETE`
+
+  * **Success Response:**
+
+    * **Code:** 200 <br />
+      **Content:** `{ status: 'ok' }`
+
+  * **Error Response:**
+
+    * **Code:** 400 <br />
+      **Content:** `{ status: 'fail', reason: 'Unauth' }`
+    
+  * **Sample Call:**
+
+    ```
+    import requests
+    r = requests.delete('https://your_url_here/v0/parameters/PM25', {} )
 
 ### Ping
 
@@ -184,6 +429,38 @@ Sotto <_server_> e' presente il progetto Python Flask che implementa i seguenti 
     * **Code:** 200 <br />
       **Content:** 
       `{ status: 'ok', message: 'pong' }`
+      
+      
+### Login
+
+  Endoint utilizzabile dal client web per autenticarsi ed essere in grado di utilizzare le API piu' delicate. Una chiamata corretta a questo endpoint aggiunge una variabile di sessione che autentica tutte le chiamate successive avvenute con lo stesso cookie
+  
+  * **URL:** 
+    /v0/login
+  * **Method:**
+
+    `POST`
+
+  * **Data Params (URL encoded):**
+
+    `user=[alphanumeric]`
+    `pass=[alphanumeric]`
+    
+  * **Success Response:**
+
+    * **Code:** 200 <br />
+      **Content:** `{ status: 'ok' }`
+
+  * **Error Response:**
+
+    * **Code:** 400 <br />
+      **Content:** `{ status: 'fail', reason: 'Unauth' }`
+    
+  * **Sample Call:**
+
+    ```
+    import requests
+    r = requests.post('https://your_url_here/v0/login', { user: 'email@host.dom', pass: 'xxxxxx' })
 
 
 Tutti i dati sono memorizzati su di un db MySQL, la cui struttura e' ancora in via di definizione.
