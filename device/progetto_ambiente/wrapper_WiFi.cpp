@@ -31,13 +31,14 @@ void wifiWrapper::printSuccessConnection(){
   printWifiStatus();
 }
 
-void wifiWrapper::connectESP(char ssid[20], char password[20] ){
+void wifiWrapper::connectESP(char ssid[20], char password[20], int pinEmergency, int ledEmergency ){
+  digitalWrite(ledEmergency, HIGH);
  //net.toCharArray(ssid, net.length()+1);
   //pass.toCharArray(password, pass.length()+1);
   //Serial.print(ssid);
   //Serial.print(password);
 
-  Serial.begin(115200);
+  //Serial.begin(115200);
   Serial1.begin(115200);
   delay(3000);
   Serial.println("start");
@@ -54,16 +55,38 @@ void wifiWrapper::connectESP(char ssid[20], char password[20] ){
     while (true);
   }
 
+  int superkiller = 0;
   // attempt to connect to WiFi network
-  while ( status != WL_CONNECTED) {
-    delay(200);
+  Serial.println(WiFi.status());
+  while ( WiFi.status() != WL_CONNECTED ) {
+    if(superkiller <= 5)
+      delay(1000);
+    else if(superkiller <= 60)
+      delay(5000);
+    else {
+      while(1) { ; }
+    }
+      
     Serial.print("Attempting to connect to WPA SSID: ");
     Serial.println(ssid);
     // Connect to WPA/WPA2 network
     status = WiFi.begin(ssid, password);
   }
+  Serial.println(WiFi.status());
 
   printSuccessConnection();
+  
+  digitalWrite(ledEmergency, LOW);
+}
+
+
+void wifiWrapper::disconnecting(){
+  Serial.print(WiFi.status());
+  client.flush();
+  client.stop();
+  WiFi.disconnect();
+  status = 0;
+  Serial.print(WiFi.status());
 }
 
 String wifiWrapper::checkForIncomingMessage() {
@@ -185,7 +208,7 @@ void wifiWrapper::httpPUT(char server[50], unsigned long value){
     client.println("Accept: */*");
     client.println("Content-Type: application/x-www-form-urlencoded");
     client.print("Content-Length: ");
-    client.println(payload.length());
+    client.println(String(payload.length()));
     client.println();
     client.print(payload);
   }
@@ -197,7 +220,9 @@ void wifiWrapper::apiCallHTTPpost(String payload, char server[50], char* type, c
   Serial.println();
   Serial.println("Starting connection to server...");
   // if you get a connection, report back via serial
-  if (client.connectSSL(server, 443)) {
+  client.flush();
+  client.stop();
+  if (client.connect(server, 80)) {
     Serial.println("Connected to server");
     // Make a HTTP request
     client.println(String(type) + " " + endpoint + " HTTP/1.1");
@@ -205,7 +230,7 @@ void wifiWrapper::apiCallHTTPpost(String payload, char server[50], char* type, c
     client.println("Accept: */*");
     client.println("Content-Type: application/x-www-form-urlencoded");
     client.print("Content-Length: ");
-    client.println(payload.length());
+    client.println(String(payload.length()));
     client.println();
     client.print(payload);
   }
@@ -217,15 +242,19 @@ void wifiWrapper::apiCallHTTPSpost(String payload, char server[50], char* type, 
   Serial.println();
   Serial.println("Starting connection to server...");
   // if you get a connection, report back via serial
+  client.flush();
+  client.stop();
   if (client.connectSSL(server, 443)) {
     Serial.println("Connected to server");
     // Make a HTTP request
-    client.println(String(type) + " " + endpoint + " HTTP/1.1");
+    client.println(String(type) + " " + endpoint + " HTTP/1.1");Serial.println(String(type) + " " + endpoint + " HTTP/1.1");
     client.println(String("Host: ") + server);
     client.println("Accept: */*");
     client.println("Content-Type: application/x-www-form-urlencoded");
+    //client.println("Content-Type: application/json");
+    client.println("Connection: keep-alive");
     client.print("Content-Length: ");
-    client.println(payload.length());
+    client.println(String(payload.length()));
     client.println();
     client.print(payload);
   }

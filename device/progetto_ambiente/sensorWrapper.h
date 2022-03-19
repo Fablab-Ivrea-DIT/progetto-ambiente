@@ -1,13 +1,24 @@
 #include "Arduino.h"
 
-#ifndef wifiWrapper_h
-  #define wifiWrapper_h
+#ifndef sensorWrapper_h
+  #define sensorWrapper_h
 
-class wifiWrapper{
+class sensorWrapper{
   public:
-  void printWifiStatus();
-  void connectESP(char ssid[20], char password[20], int pinEmergency  , int ledEmergency     );
-  void disconnecting();
+  void SDSsetup();
+  void SDStest();
+  float SDSpm25();
+  float SDSpm10();
+  void BMPsetup();
+  void BMPtest();
+  float BMPtemp();
+  float BMPpres();
+  void MHZsetup();
+  void MHZtest();
+  float MHZco2();
+  float MHZtemp();
+  /*void printWifiStatus();
+  void connectESP(char ssid[20], char password[20] );
   void printSuccessConnection();
   String checkForIncomingMessage();
   void checkForConnectionEvents();
@@ -19,10 +30,10 @@ class wifiWrapper{
   void httpPING(char server[50]);
   void httpsPING(char server[50]);
   void httpPUT(char server[50], unsigned long value);
-
+*/
 };
 
-  extern wifiWrapper wifi;
+  extern sensorWrapper sensors;
  
 #endif
 
