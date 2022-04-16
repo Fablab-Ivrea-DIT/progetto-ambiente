@@ -25,24 +25,3 @@ class wifiWrapper{
   extern wifiWrapper wifi;
  
 #endif
-
-/* INDEX OF FUNCTIONS 
-  SETUP
-  expectSerial();
-  blueUp(); // bang! bring up serial conection with bluefruit
-  buttonUp();// initializes the buttons
-  
-  GENERAL
-  bluePrint('char'); // prints passed argument
-  pressEvent();//detects debounced press
-  holdForButton;//holds up the whole loop for an expected event
-  surePress();//Makes sure the button was release before registering another press
-  
-  TESTING
-  printabletest(); 
-  altkeystest();
-  nonprinting();
-  iphonekeyboard();
-  rawkeytest();
-  rawmousetest();
-*/
