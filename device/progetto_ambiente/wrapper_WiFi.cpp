@@ -31,6 +31,7 @@ void wifiWrapper::printSuccessConnection(){
 }
 
 void wifiWrapper::connectESP(char ssid[20], char password[20], int pinEmergency, int ledEmergency ){
+  
   digitalWrite(ledEmergency, HIGH);
  
   Serial1.begin(115200);
@@ -42,7 +43,6 @@ void wifiWrapper::connectESP(char ssid[20], char password[20], int pinEmergency,
   
   if (WiFi.status() == WL_NO_SHIELD) {
     Serial.println("WiFi shield not present");
-    // don't continue
     while (true);
   }
 

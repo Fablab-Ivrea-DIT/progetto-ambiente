@@ -4,14 +4,18 @@
 #include <Wire.h>
 #include <SPI.h>
 
-
-unsigned long lastConnectionTime = 0;
-unsigned long lastReadingTime = 0;
 const unsigned long postingInterval = 300000L;   // tempo trascorso tra ogni chiamata al server
 const unsigned long readingInterval = 10000L;   // tempo trascorso tra ogni lettura dei sensori
+
+//variabili di appoggio
+unsigned long lastConnectionTime = 0;
+unsigned long lastReadingTime = 0;
 const int numReadings = postingInterval / readingInterval;
 const int pinWiFiEnable = 3;
 const int pinWiFiLedEmergency = 5;
+int superindex = 0;
+float tmp[numReadings][5];
+String result = "";
 
 char ssid[] = "";  //NOME DEL WIFI
 char password[] = ""; //PASSWORD DEL WIFI
@@ -23,12 +27,8 @@ String payload = "";  //INIZIALIZZO IL PAYLOAD
 
 // MATRICE 5X3 DEI RISULTATI
 float results[5][3] = { {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0} }; //prima pm10, poi pm25, poi co2, poi temp, poi pres. mean, min, max
-int superindex = 0;
 
-float tmp[numReadings][5];
-
-String result = "";
-StaticJsonDocument<200> doc; //https://arduinojson.org/v6/assistant
+StaticJsonDocument<200> doc;
 
 void setup()
 {
@@ -44,6 +44,7 @@ void setup()
   digitalWrite(pinWiFiLedEmergency, LOW);
 
   //INIZIALIZZO I SENSORI
+  //SENZA SENSORI COLLEGATI IL SISTEMA SI BLOCCA
   sensors.SDSsetup();
   sensors.BMPsetup();
   sensors.MHZsetup();
@@ -54,8 +55,29 @@ void loop()
 {
   
   result = wifi.checkForIncomingMessage();
-  
 
+  /*
+    Il codice che segue serve per leggere le risposte del server.
+    Decommentare in caso di necessità
+   
+   if(result != "") {
+    result = result.substring(result.indexOf('{'));
+    StaticJsonDocument<200> doc;
+    DeserializationError error = deserializeJson(doc, result);
+    if (error) {
+      Serial.print("deserializeJson() failed: ");
+      Serial.println(error.f_str());
+    } else {
+      Serial.println();
+      String risultato = doc["message"];
+      Serial.println(risultato);
+    }
+  }*/
+
+
+  //ESEGUO TRASMISSIONE DATI
+  /*In superindex salvo quante letture ho eseguito e se questo numero è >= del numero delle letture
+  che mi aspetto, e se è passato il tempo in postingInterval, comunico al server i dati*/
   if (superindex >= numReadings && millis() - lastConnectionTime > postingInterval) {
     
     digitalWrite(pinWiFiEnable, HIGH);
@@ -71,7 +93,6 @@ void loop()
     //COSTRUZIONE DEL PAYLOAD
     payload = "device_id=AM001&token=4bec25a5-28c7-407b-9fb3-4ee77fe8707c&values=";
 
-    //payload = "";
     payload += "PM10:";
     payload.concat(results[0][0]);
     payload += ":";
@@ -107,28 +128,28 @@ void loop()
     payload += ":";
     payload.concat(results[4][2]);
 
-    //payload.concat("'}");
-
-
     //MANDO I DATI AL SERVER TRAMITE API
-    Serial.println("Command Test");
+    Serial.println("Sending data...");
     payload.toCharArray(payloadCHAR, payload.length()+1);
-    //Serial.println(payload);
     Serial.println(payloadCHAR);
-    //delay(10000);
     wifi.apiCallHTTPSpost(payloadCHAR, server, type, endpoint, 443);
     //wifi.httpsPING(server);
     lastConnectionTime = millis();
     superindex = 0;
 
+    wifi.disconnecting();
+    delay(200);
     
     digitalWrite(pinWiFiEnable, LOW);
   }
 
 
   //ESEGUO LE MISURAZIONI
+  /*In superindex salvo quante letture ho eseguito e se questo numero è < del numero delle letture
+  che mi aspetto, e se è passato il tempo in readingInterval, eseguo la misurazione*/
   if (superindex < (numReadings) && millis() - lastReadingTime > readingInterval) {
-    
+
+    //Popolo l'array delle misurazioni
     delay(100);
     tmp[superindex][0] =  sensors.SDSpm10();
     delay(100);
